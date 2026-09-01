@@ -1,0 +1,86 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: docqa
+      POSTGRES_PASSWORD: docqa
+      POSTGRES_DB: docqa
+    ports:
+      - "5432:5432"
+    volumes:
+      - docqa_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docqa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Celery's broker. No persistence volume needed — a lost/restarted Redis
+  # only drops in-flight task deliveries, and Postgres (ingestion_jobs) is
+  # still the source of truth for what's pending; reclaim_stuck_jobs (run at
+  # worker startup) cleans up anything left stranded at `processing`.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: brings the public schema's Alembic history up to date, then
+  # exits. api/worker both wait on this rather than each racing to migrate
+  # on their own — only the control plane is Alembic-managed (see
+  # db/tenant_base.py); tenant schemas are provisioned at signup time.
+  migrate:
+    build: .
+    command: alembic upgrade head
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://docqa:docqa@postgres:5432/docqa
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    command: uvicorn docqa.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Overrides the .env values (meant for a host process talking to
+      # postgres's/redis's published ports) with the compose network's own
+      # service hostnames — containers and a host process reach these over
+      # different networks.
+      DATABASE_URL: postgresql+psycopg://docqa:docqa@postgres:5432/docqa
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./storage:/app/storage
+
+  worker:
+    build: .
+    command: celery -A docqa.celery_app worker --loglevel=info
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://docqa:docqa@postgres:5432/docqa
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./storage:/app/storage
+
+volumes:
+  docqa_pg_data:
