@@ -4,7 +4,7 @@ B2B multi-tenant document Q&A SaaS. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE
 for the full backend design and [frontend/README.md](frontend/README.md) for the frontend.
 
 **Status:** Backend and frontend are both built and verified end-to-end against the real
-NVIDIA NIM, Pinecone, and Docker stack — 63 automated backend tests passing. Both PDF and
+NVIDIA NIM, Pinecone, and Docker stack — 66 automated backend tests passing. Both PDF and
 DOCX upload are fully supported; nothing is left from the original plan except live
 deployment.
 
@@ -33,6 +33,23 @@ Backend, in build order:
 
 **Fully verified against the real NVIDIA NIM and Pinecone APIs**, not just mocked — see
 the embedding model note below.
+
+## Screenshots
+
+**Landing page**
+![Landing page](docs/screenshots/landing.jpg)
+
+**Chat with citations** — a real multi-turn conversation, grounded in an uploaded document, with page-level citations on every answer.
+![Chat with citations](docs/screenshots/chat.jpg)
+
+**Document upload & ingestion status**
+![Documents](docs/screenshots/documents.jpg)
+
+**Team management** — admin/member roles within a tenant.
+![Team](docs/screenshots/team.jpg)
+
+**Account & session management**
+![Account](docs/screenshots/account.jpg)
 
 ## Prerequisites
 
